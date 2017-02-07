@@ -1,0 +1,155 @@
+---
+title: "Levantamento de processos sobre educação no TJSP"
+author: "Associação Brasileira de Jurimetria"
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+linkcolor: "blue"
+geometry: bmargin=1.5in,lmargin=.8in,rmargin=.8in,tmargin=.7in
+---
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, echo = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(stringr)
+library(forcats)
+library(esaj)
+library(tjsp)
+```
+
+# Introdução
+
+Este texto tem como objetivo listar os assuntos processuais associados ao tema "direito do consumidor" usando como base os processos judiciais disponíveis na ferramenta de pesquisa "Consulta de Julgados de Primeiro Grau" do TJSP. É possível resolver esse problema utilizando a Tabela Processual Unificada de assunto, dispobilizada pelo CNJ, mas a principal dúvida é se existem muitos processos de direito do consumidor que não respeitam a classificação sugerida.
+
+Para isso, fizemos o levantamento de listas de sentenças do TJSP por assunto e por ano, com base nos assuntos descritos na Tabelas Processuais Unificadas (TPUs, Res. 46 CNJ). Em cada uma dessas listas, detectamos a presença de um conjunto de palavras chave que estão associadas à justiça consumerista. Quando a busca de termos retornou algum conteúdo, utilizamos o resultado para classificar um assunto como "potencialmente consumerista".
+
+# Metodologia
+
+O primeiro passo do estudo foi levantar a lista de assuntos na página do TJSP. Em seguida, retiramos da lista aqueles assuntos da TPU que provavelmente não estão associados à justiça consumerista. Esse filtro foi feito retirando todos os assuntos que decorrem dos seguintes assuntos gerais:
+
+- "DIREITO PENAL"
+- "DIREITO DA CRIANÇA DE DO ADOLESCENTE"
+- "DIREITO DO TRABALHO"
+- "DIREITO PROCESSUAL PENAL"
+- "DIREITO MARÍTMO"
+
+A lista de assuntos final continha 753 assuntos gerais.
+
+```{r}
+# assuntos <- cjpg_tabs('assunto')
+# write_rds(assuntos, 'assuntos.rds')
+assuntos <- read_rds('assuntos.rds')
+leafs <- assuntos %>%
+  filter(titulo0 %in% c("DIREITO DO CONSUMIDOR",
+                        "DIREITO CIVIL",
+                        "DIREITO INTERNACIONAL",
+                        "DIREITO TRIBUTÁRIO",
+                        "DIREITO PROCESSUAL CIVIL E DO TRABALHO",
+                        "DIREITO PREVIDENCIÁRIO",
+                        "DIREITO ADMINISTRATIVO E OUTRAS MATÉRIAS DO DIREITO PÚBLICO")) %>% 
+  mutate_all(funs(str_replace_na(., replacement = ""))) %>% 
+  with(c(cod_leaf, cod0, cod1, cod2, cod3, cod4)) %>% 
+  enframe() %>% 
+  set_names(c('id', 'cod_leaf')) %>% 
+  distinct(cod_leaf, .keep_all = T) %>% 
+  with(cod_leaf)
+  
+```
+
+O segundo passo do levantamento foi realizar uma pesquisa no site do TJSP para cada ano e cada assunto obtido. Isso foi feito de forma automatizada a partir da utilização de rotinas computacionais desenvolvidas pela ABJ, utilizando-se o software estatístico R. O código-fonte utilizado para essa pesquisa e os dados obtidos estão diponíveis [nesse link](https://github.com/abjur/educacaoTJSP).
+
+```{r eval=FALSE}
+s <- cjpg_session()
+
+tots <- tibble(leaf = leafs, ano = list(2015)) %>% 
+  unnest(ano) %>% 
+  group_by(leaf, ano) %>% 
+  do(result_df = {
+    parms <- cjpg_parms(s, assuntos = .$leaf,
+                        data_inicial = sprintf('%d-01-01', .$ano),
+                        data_final = sprintf('%d-12-31', .$ano))
+    caminho <- paste0('data-raw/cjpg/',.$leaf,'_',.$ano,'/')
+    dir.create(caminho)
+    cjpg(s, parms, max_pag = 10, path = caminho)
+  }) %>% 
+  ungroup() %>% 
+  unnest(result_df)
+```
+
+O terceiro passo da metodologia foi detectar as amostras em que aparece um conjunto de palavras-chave relevantes nos processos consumeristas. Para evitar falsos positivos, utilizamos uma lista pequena de termos muito importantes.
+
+- "CDC"
+- "Lei 8.078/90"
+- "Codigo de Defesa do Consumidor"
+- "Lei 7.347/85" (Lei da ação civil pública)
+
+```{r, eval = F}
+le_textos <- function(file_name){
+  xml2::read_html(file_name, encoding = 'utf-8') %>% 
+  rvest::html_nodes(css = "div[align='justify'][style='display: none;']>span") %>% 
+  rvest::html_text()}
+
+textos_raw <- list.files("data-raw/cjpg", recursive = T, full.names = T) %>% 
+  purrr::map(le_textos)
+  
+textos <- textos_raw %>% 
+  unlist %>% 
+  str_replace_all("[\n\f\t ]+"," ")
+
+comprimentos <- textos_raw %>% 
+  purrr::map(length) %>% 
+  unlist()
+
+id <- list.files("data-raw/cjpg", recursive = T, full.names = F) %>% 
+  purrr::map2(comprimentos, function(.x,.y){rep(.x, each = .y)}) %>% 
+  unlist()
+
+base_de_textos <- data_frame(arq = id) %>% 
+   separate(arq, into = c("leaf", "arq"), sep = "/") %>% 
+  mutate(texto = textos) %>% 
+  mutate(encontrou_texto = str_detect(texto, " ([Ll]ei )?8\\.?078((/90)| |$)|CDC|[Cc]ódigo (de )?[Dd]efesa (do )?[Cc]onsumidor| ([Ll]ei )?7\\.?347((/85)| |$)")) %>%
+  mutate(id_arq = leaf) %>% 
+  separate(leaf, into = c("leaf", "ano")) %>% 
+  inner_join(assuntos, by = c("leaf" = "cod_leaf"))
+
+apenas_consumeristas <- assuntos %>% 
+  filter(titulo0 == "DIREITO DO CONSUMIDOR") %>% 
+  with(unique(cod_leaf))
+
+write_rds(base_de_textos, 'base_de_textos.rds')
+```
+
+```{r}
+base_de_textos <- read_rds("base_de_textos.rds")
+```
+
+
+# Resultados
+
+A Tabela \@ref(tab:tabprop) mostra a proporção de processos em que encontrou-se pelo menos uma das palavras-chave utilizadas. Observe que todos os processos do assunto "DIREITO DO CONSUMIDOR" apresentam pelo menos uma ocorrência cada.
+
+```{r tabprop}
+base_de_textos %>%
+  group_by(titulo_leaf, titulo0) %>%
+  summarise(prop = mean(encontrou_texto)) %>% 
+  ungroup() %>% 
+  mutate(titulo0 = factor(titulo0),
+         titulo0 = fct_relevel(titulo0, "DIREITO DO CONSUMIDOR")) %>% 
+  arrange(titulo0, desc(prop))
+```
+
+Filtrando apenas as linhas da Tabela \@ref(tab:tabprop) com proporção positiva, a lista de processos "consumeristas em potencial" está descrita em \@ref(tab:tabprop2)
+
+```{r tabprop2}
+
+base_de_textos %>%
+  group_by(titulo_leaf, titulo0) %>%
+  summarise(prop = mean(encontrou_texto)) %>% 
+  ungroup() %>% 
+  mutate(titulo0 = factor(titulo0),
+         titulo0 = fct_relevel(titulo0, "DIREITO DO CONSUMIDOR")) %>% 
+  arrange(titulo0, desc(prop)) %>% 
+  filter(prop > 0)
+
+```

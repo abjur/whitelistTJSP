@@ -1,0 +1,9 @@
+Package: whitelistTJSP
+Title: Lista De Assuntos Processuais Potencialmente Consumeristas Do TJSP
+Version: 0.0.0.9000
+Authors@R: person("Fernando", "Corrêa", email = "fcorrea@abjur.com", role = c("aut", "cre"))
+Description: Descreve e reproduz a metodologia utilizada na elaboração de uma lista de assuntos que serão utilizados em uma extração de base de dados no TJSP.
+Depends: R (>= 3.3.2)
+License: MIT + LICENSE
+Encoding: UTF-8
+LazyData: true
