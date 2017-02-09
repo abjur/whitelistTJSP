@@ -171,7 +171,7 @@ library(esaj)
 library(tjsp)
 
 assuntos <- read_rds('assuntos.rds')
-whitelist <- openxlsx::read.xlsx("../educacaoTJSP/whitelist.xlsx")
+whitelist <- openxlsx::read.xlsx("whitelist.xlsx")
 
 whitelist_completa <- whitelist %>% 
   inner_join(assuntos, by = c('titulo_leaf', 'titulo0')) %>% 
@@ -186,3 +186,22 @@ whitelist_completa <- whitelist %>%
   distinct(assunto, .keep_all = T) %>% 
   select(assunto, cod)
 ```
+
+## Checks and balances
+
+No código abaixo, verificamos se os códigos extraídos pelo pacote tjsp são os mesmos códigos das TPU's do CNJ.
+
+```{r, eval = F}
+library(tpur)
+
+tabela <- tpur::download_table("assunto","estadual","primeiro grau") %>% 
+  tpur::build_table()
+
+merged_tables <- tabela %>% 
+  left_join(whitelist_completa, by = c('codigo' = 'cod'))
+
+merged_tables %>% 
+  filter(!is.na(assunto)) %>% 
+  select(assunto,n5,n4,n3,n2)
+```
+
