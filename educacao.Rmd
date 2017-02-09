@@ -143,7 +143,7 @@ Filtrando apenas as linhas da Tabela \@ref(tab:tabprop) com proporção positiva
 
 ```{r tabprop2}
 
-base_de_textos %>%
+whitelist <- base_de_textos %>%
   group_by(titulo_leaf, titulo0) %>%
   summarise(prop = mean(encontrou_texto)) %>% 
   ungroup() %>% 
@@ -152,4 +152,37 @@ base_de_textos %>%
   arrange(titulo0, desc(prop)) %>% 
   filter(prop > 0)
 
+```
+
+## Toques finais
+
+```{r}
+
+whitelist_completa <- whitelist %>% 
+  inner_join(assuntos, by = c('titulo_leaf', 'titulo0')) %>% 
+  select(contains("titulo")) %>% 
+  gather('tipo','assunto') %>% 
+  distinct(assunto)
+
+library(tidyverse)
+library(stringr)
+library(forcats)
+library(esaj)
+library(tjsp)
+
+assuntos <- read_rds('assuntos.rds')
+whitelist <- openxlsx::read.xlsx("../educacaoTJSP/whitelist.xlsx")
+
+whitelist_completa <- whitelist %>% 
+  inner_join(assuntos, by = c('titulo_leaf', 'titulo0')) %>% 
+  select(contains("titulo"), contains("cod")) %>% 
+  gather('titulo','assunto', -contains("cod")) %>% 
+  mutate(cod = ifelse(titulo == "titulo_leaf", cod_leaf,
+                      ifelse(titulo == "titulo0", cod0,
+                             ifelse(titulo == 'titulo1', cod1,
+                                    ifelse(titulo == 'titulo2', cod2,
+                                           ifelse(titulo == 'titulo3', cod3,
+                                                  ifelse(titulo == 'titulo4', cod4, NA))))))) %>% 
+  distinct(assunto, .keep_all = T) %>% 
+  select(assunto, cod)
 ```
