@@ -158,25 +158,20 @@ whitelist <- base_de_textos %>%
 
 ```{r}
 
-whitelist_completa <- whitelist %>% 
-  inner_join(assuntos, by = c('titulo_leaf', 'titulo0')) %>% 
-  select(contains("titulo")) %>% 
-  gather('tipo','assunto') %>% 
-  distinct(assunto)
-
 library(tidyverse)
 library(stringr)
 library(forcats)
 library(esaj)
 library(tjsp)
+library(dplyr)
 
-assuntos <- read_rds('assuntos.rds')
 whitelist <- openxlsx::read.xlsx("../educacaoTJSP/whitelist.xlsx")
+assuntos <- read_rds('assuntos.rds')
 
 whitelist_completa <- whitelist %>% 
   inner_join(assuntos, by = c('titulo_leaf', 'titulo0')) %>% 
-  select(contains("titulo"), contains("cod")) %>% 
-  gather('titulo','assunto', -contains("cod")) %>% 
+  select(dplyr::contains("titulo"), dplyr::contains("cod")) %>% 
+  gather('titulo','assunto', -dplyr::contains("cod")) %>% 
   mutate(cod = ifelse(titulo == "titulo_leaf", cod_leaf,
                       ifelse(titulo == "titulo0", cod0,
                              ifelse(titulo == 'titulo1', cod1,
@@ -186,3 +181,47 @@ whitelist_completa <- whitelist %>%
   distinct(assunto, .keep_all = T) %>% 
   select(assunto, cod)
 ```
+
+## Comparação com outras metodologias
+
+```{r read_manual_class, echo = F}
+
+class_manual_abj <- readRDS("data.rds") %>% 
+  filter(whitelist >= 0.5) %>% 
+  mutate(titulo_leaf = ifelse(n6 != '', n6,
+                              ifelse(n5 != '', n5, 
+                                     ifelse(n4 != '', n4, 
+                                            ifelse(n3 != '', n3,
+                                                   ifelse(n2 != '', n2))))))
+
+```
+
+Para avaliar a qualidade da classificação obtida de maneira "puramente jurimetrica", comparamos a tabela de assuntos obtida acima com uma lista de assuntos classificada manualmente pelos pesquisadores da ABJ. Na parte deste relatório que segue abaixo, a lista obtida de forma automática será chamada de **lista suja**, enquanto a lista obtida manualmente será chamada de **lista limpa**.
+
+Constam apenas 73 assuntos processuais na **lista limpa**, enquanto a **lista suja** possui 208 assuntos. Desses 208, apenas 4 não aparecem na **lista limpa**. Nessa lista de diferenças, chama a atenção a presença de um assunto do ramo "DIREITO DO CONSUMIDOR". O assunto faltante, "Clausulas Abusivas", não foi contabilizado pois a busca por processos desse assunto não retornou nenhum caso.
+
+```{r, }
+
+abj_sem_robo <- class_manual_abj %>% 
+  anti_join(whitelist, by = 'titulo_leaf') %>% 
+  select(n1,n2,n3,n4,n5,n6)
+
+abj_sem_robo %>% 
+  knitr::kable(format = 'markdown', caption = 'Assuntos que constam na lista limpa mas não constam na lista suja.')
+
+```
+
+Fazendo o mesmo exercício, mas no sentido inverso, detectamos 138 assuntos que aparecem apenas na lista suja, mas não na lista limpa. Existem apenas dois casos com propoção de ocorrência das palavras chave de Direito do Consumidor maior do que 50%: "Warrant" e "Expurgos inflacionários sobre os benefícios".
+
+```{r}
+
+robo_sem_abj <- whitelist %>% 
+  anti_join(class_manual_abj, by = 'titulo_leaf') %>% 
+  arrange(prop)
+ 
+robo_sem_abj %>% 
+  knitr::kable(format = 'markdown', caption = 'Assuntos que constam na lista suja mas não constam na lista limpa.')
+
+```
+
+
