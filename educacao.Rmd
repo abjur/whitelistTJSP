@@ -1,5 +1,5 @@
 ---
-title: "Levantamento de processos sobre educação no TJSP"
+title: "Levantamento de processos sobre Defesa dos Direitos do Consumidor"
 author: "Associação Brasileira de Jurimetria"
 date: "`r format(Sys.Date(), '%d de %B de %Y')`"
 linkcolor: "blue"
@@ -57,7 +57,7 @@ leafs <- assuntos %>%
   
 ```
 
-O segundo passo do levantamento foi realizar uma pesquisa no site do TJSP para cada ano e cada assunto obtido. Isso foi feito de forma automatizada a partir da utilização de rotinas computacionais desenvolvidas pela ABJ, utilizando-se o software estatístico R. O código-fonte utilizado para essa pesquisa e os dados obtidos estão diponíveis [nesse link](https://github.com/abjur/educacaoTJSP).
+O segundo passo do levantamento foi realizar uma pesquisa no site do TJSP para cada ano e cada assunto obtido. Isso foi feito de forma automatizada a partir da utilização de rotinas computacionais desenvolvidas pela ABJ, utilizando-se o software estatístico R. O código-fonte utilizado para essa pesquisa e os dados obtidos estão diponíveis [nesse link](https://github.com/abjur/whitelistTJSP).
 
 ```{r eval=FALSE}
 s <- cjpg_session()
